@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+      - name: Install self + deps
+        run: |
+          uv sync --all-groups
+          uv pip install -e .
+      - name: Install agent-memory (local path if available, else git)
+        run: |
+          uv pip install ../agent-memory || uv pip install git+https://github.com/szechung2000/agent-memory.git
+      - name: Lint
+        run: uv run ruff check .
+      - name: Tests
+        run: uv run pytest -q
