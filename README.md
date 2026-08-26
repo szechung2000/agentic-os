@@ -1,62 +1,69 @@
 # agentic-os
 
-Supervisor/worker agent orchestration with a Telegram interface, built on [agent-memory](https://github.com/szechung2000/agent-memory) as its long-term brain.
-
-![status](https://github.com/szechung2000/agentic-os/actions/workflows/ci.yml/badge.svg)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+A supervisor/worker agent orchestration layer, living on top of
+[agent-memory](https://github.com/szechung2000/agent-memory) as its
+long-term semantic + episodic brain. For Simon's Georgia Tech OMSCS
+portfolio: this is the agentic OS with a Telegram interface that lets
+him talk to the system while he's working or caring for his kids.
 
 ## Architecture
 
 ```
-                    ┌────────────────────┐
- Telegram / CLI ──► │    SUPERVISOR      │
-                    │  route → delegate  │
-                    │  → compose reply   │
-                    └─────────┬──────────┘
-                              │ routes by capability
-              ┌───────────────┼────────────────┐
-              ▼               ▼                ▼
-        ┌──────────┐    ┌──────────┐    ┌──────────┐
-        │  memory  │    │   echo   │    │ (future) │
-        │  worker  │    │  worker  │    │  workers │
-        └────┬─────┘    └──────────┘    └──────────┘
-             │ tools: memory_write / search / context
-             ▼
-      agent-memory service ◄── long-term semantic + episodic memory
+Telegram / CLI ───► SUPERVISOR ───► WORKER 1 … WORKER N
+                       │                 │
+                 route → delegate   worker tools
+                       │                 │
+                 compose reply       └──► agent-memory (semantic/episodic)
 ```
 
-- **Supervisor** — the only component that reasons. LLM mode (OpenAI key) with bounded tool-calling rounds, or rule mode (offline, zero keys): `remember that X` → memory write; questions → memory search; else fallback.
-- **Workers** — dumb-but-reliable capability holders (`memory`, `echo`, more coming). Structured task in, structured result out.
-- **agent-memory** — the shared long-term brain: hybrid retrieval, temporal reasoning, consolidation. See its [evals](https://github.com/szechung2000/agent-memory#showcase-the-capacity-golden-evals).
+- **Supervisor** – the only reasoning component. Two modes:
+  - *LLM mode*: OpenAI key → bounded tool-calling rounds (ReAct-style), each
+    round the model picks a worker tool and we feed its result back.
+  - *Rule mode*: fully offline; `remember that X` → memory write, anything
+    phrased as a question → memory search, else echo fallback. Used in this
+    scaffold for testability and demos.
+- **Workers** – dumb-but-reliable capability holders with structured
+  task-in / result-out. Each worker owns one tool set.
+  - `memory` worker – delegates to agent-memory's `MemoryToolExecutor`
+    (tool names: `memory_write`, `memory_search`, `memory_context`).
+  - `echo` worker – fallback/general-purpose worker with no external deps.
+- **agent-memory** – shared long-term brain: hybrid retrieval, temporal
+  reasoning, consolidation, and graded evals. Papers suite currently runs
+  at **90%** (L2 100%, L3 60%), multihop 83%, glossary/temporal 100%
+  (with latency timing). See its
+  [evals README table](https://github.com/szechung2000/agent-memory#showcase-the-capacity-golden-evals).
 
-## Run it
+## Quick start
 
 ```bash
 uv sync --all-groups
-uv pip install -e ".[telegram]"            # telegram extra optional
-uv pip install -e "../agent-memory"        # memory brain (or from git)
-
-# offline chat demo — no API keys needed
-agos chat
-
-# with Telegram
-export AGOS_TELEGRAM_BOT_TOKEN=...
-export AM_OPENAI_API_KEY=...               # optional: full LLM supervisor
-agos telegram
+uv pip install -e ".[telegram]"   # optional Telegram extra
+uv pip install -e "../agent-memory"  # memory brain
 ```
 
-## Demo session (rule mode)
+## Demo: rule mode (no API keys needed)
+
+Drop into the project root and run:
+
+```bash
+export AM_DATABASE_URL="sqlite:////tmp/agos-demo.db"
+rm -f /tmp/agos-demo.db
+printf "remember that Simon prefers Python and uv for data work\nwhat does Simon prefer for data work?\nhello there\n" | agos chat --memory-db "sqlite:////tmp/agos-demo.db"
+```
+
+Expected output (with real agent-memory backend):
 
 ```
-$ agos chat
-> remember that Simon prefers Python and uv for data work
+agentic-os chat (rule mode)
 [memory] Remembered.
-> what does Simon prefer for data work?
 [memory] From your memory:
 - Simon prefers Python and uv for data work
-> hello there
 [echo] echo: hello there
 ```
+
+The first two lines show the memory worker storing and then retrieving
+through the real agent-memory pipeline; the third line is the echo
+fallback.
 
 ## Tests
 
@@ -64,8 +71,17 @@ $ agos chat
 python -m pytest tests/
 ```
 
-7 tests cover routing rules, remember→recall roundtrip through a real
-agent-memory backend, echo fallback, and trace output.
+7 tests covering routing rules, the remember→recall roundtrip through a
+real agent-memory backend, echo fallback, and trace output.
+
+## Telegram
+
+Optional. After `uv pip install -e ".[telegram]"`, set:
+
+- `AGOS_TELEGRAM_BOT_TOKEN` – your bot token
+- `AM_OPENAI_API_KEY` – optional: enables the LLM supervisor mode
+
+Then `agos telegram`.
 
 ## License
 
