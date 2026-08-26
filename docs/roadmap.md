@@ -26,12 +26,17 @@ This scaffold predates the formal specification. Each component must be reconcil
 - Run state machine and append-only event store.
 - Checkpoint/restart support.
 - Structured trace CLI/API.
+- Typed extension registries for runtimes, workers, tools, evaluators, planning surfaces, interfaces, memory policy, and skills.
+- Runtime presets that compose registered capabilities without supervisor branches.
 
 ### Acceptance tests
 
 - A process can stop mid-run and resume without duplicating completed work.
 - Invalid worker output is rejected with a bounded correction attempt.
 - Replanning records the old plan, new plan, and reason.
+- A test provider replaces an existing capability without changing supervisor code.
+- Every model-visible context item is reconstructable from its recorded provenance.
+- Unregistering an extension reverses its registrations and releases owned resources.
 
 ## E1 — Headless runtime adapters
 
@@ -116,13 +121,16 @@ This scaffold predates the formal specification. Each component must be reconcil
 ### Deliverables
 
 - Skill manifest, filesystem/Git registry, metadata index, and retrieval.
+- Three-stage progressive disclosure: metadata index → selected `SKILL.md` → targeted reference files.
+- Shared, external, and trusted project-local skill sources with explicit precedence.
 - Skill hydration into worker task contracts.
 - Proposal, validation, versioning, and publication workflow.
 - Compatibility and staleness checks.
 
 ### Acceptance tests
 
-- A specialist receives only skills relevant to its task.
+- A specialist receives only skills relevant to its task and only loads referenced detail on demand.
+- A trusted project-local skill can override a shared skill without modifying the shared source.
 - A successful complex workflow proposes a skill with verification steps.
 - A stale command fails validation and the skill update is reviewed before publication.
 - Both supervisor and specialist workers can use the same shared skill.

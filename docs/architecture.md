@@ -1,5 +1,7 @@
 # Agentic OS Architecture
 
+This architecture is informed by [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [Hermes Agent](https://github.com/NousResearch/hermes-agent). See [Reference Architectures](reference-architectures.md) for the source-grounded mapping of adopted ideas, adaptations, and deliberate non-goals.
+
 ## 1. System context
 
 ```text
@@ -164,6 +166,32 @@ run.completed / run.failed / run.cancelled
 ```
 
 The current run state is reconstructed from events plus periodic checkpoints. Telegram updates are projections of significant events.
+
+### ADR-8: Typed extension registry and capability seams
+
+Inspired by DeepSeek Harness's plugin composition and Hermes Agent's provider/tool registries, Agentic OS uses typed extension points instead of adding provider-specific branches to the supervisor. The initial registries are:
+
+```text
+runtime_adapters
+worker_roles
+tool_providers
+evaluators
+planning_surfaces
+interfaces
+memory_policies
+skill_providers
+```
+
+A complete capability defines: protocol, provider lifecycle, consumer, validated configuration, emitted events, permission needs, and failure semantics. Registrations return a disposer so tests, profiles, and process shutdown can unwind effects deterministically.
+
+Named runtime presets compose extensions and policy for common modes:
+
+- `local`: local CLIs, local worktrees, SQLite-compatible agent-memory;
+- `docker`: container worker runner, Postgres/pgvector, Redis coordination;
+- `research`: web/research tools, read-only project access by default;
+- `coding`: repository tools, worktree isolation, tests, GitHub publication.
+
+Model-visible context has a strict provenance invariant: every prompt item must be reconstructable from a run event, memory ID, skill version, source URL, or artifact reference.
 
 ## 3. Supervisor lifecycle
 

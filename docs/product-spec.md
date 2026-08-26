@@ -12,7 +12,11 @@ Agentic OS turns a high-level objective into an evidence-backed project outcome.
 
 It is not merely a chat interface or a wrapper around one coding model. It is a durable orchestration layer over interchangeable headless agent runtimes, persistent memory, reusable skills, project systems, and explicit evaluation loops.
 
-## 2. Product principles
+## 2. Reference systems
+
+The design explicitly studies [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [Hermes Agent](https://github.com/NousResearch/hermes-agent). DeepSeek Harness informs plugin composition, capability seams, durable event logs, and reconstructable model context. Hermes Agent informs the platform-agnostic agent core, runtime/tool registries, messaging gateway, delegation, progressive skill disclosure, and curated-versus-searchable memory. See [Reference Architectures](reference-architectures.md) for the grounded comparison and adoption boundaries.
+
+## 3. Product principles
 
 1. **Goal-directed, not prompt-directed.** Optimize for the overarching goal and acceptance criteria, not the most recent isolated instruction.
 2. **Evidence before commitment.** Research and prototype uncertain approaches before selecting one.
@@ -24,7 +28,7 @@ It is not merely a chat interface or a wrapper around one coding model. It is a 
 8. **Inspectable execution.** Every plan, delegation, tool call, decision, evaluation, and artifact has a trace.
 9. **Local-first and Docker-ready.** A developer can run the complete system locally or in containers without a cloud control plane.
 
-## 3. Primary use case
+## 4. Primary use case
 
 ### Eval-driven project assistant
 
@@ -45,7 +49,7 @@ The system:
 9. On approval where required, implements the winner and opens a GitHub pull request.
 10. Updates GitHub/Google Drive planning artifacts and stores durable lessons as memories or skills.
 
-## 4. Functional requirements
+## 5. Functional requirements
 
 ### FR-1 Goal intake and project contract
 
@@ -137,7 +141,7 @@ The approval request must identify the exact target, reason, and expected effect
 
 A shared skill library shall be readable by the supervisor and all specialists. Skills include trigger conditions, procedures, commands, pitfalls, and verification steps. Workers may propose new or updated skills after successful non-trivial workflows; the supervisor validates and publishes them.
 
-## 5. Memory requirements
+## 6. Memory requirements
 
 agent-memory is the only memory implementation. Agentic OS owns policy and addressing, not embedding or retrieval internals.
 
@@ -162,7 +166,7 @@ Short-term memory has explicit TTL or task/session ownership. Long-term memory i
 
 Every memory records namespace, owner, project, task/run, visibility, provenance, timestamp, and optional expiry.
 
-## 6. Non-functional requirements
+## 7. Non-functional requirements
 
 - **NFR-1 Reproducibility:** each run records runtime adapter, model, prompt/task contract, repository state, tool versions, and evaluator version.
 - **NFR-2 Isolation:** concurrent coding trials use separate worktrees or containers.
@@ -173,7 +177,7 @@ Every memory records namespace, owner, project, task/run, visibility, provenance
 - **NFR-7 Portability:** Docker Compose is the supported reproducible deployment; local `uv` execution remains supported.
 - **NFR-8 Regression safety:** selected changes cannot merge while required project evaluations regress.
 
-## 7. Out of scope for v1
+## 8. Out of scope for v1
 
 - Multi-user tenancy or public bot operation.
 - Autonomous financial trading or other irreversible real-world actions.
@@ -182,7 +186,7 @@ Every memory records namespace, owner, project, task/run, visibility, provenance
 - Silent destructive operations.
 - Unbounded self-replication or recursive worker spawning.
 
-## 8. Success criteria for v1
+## 9. Success criteria for v1
 
 1. A user submits a high-level project goal through Telegram.
 2. The supervisor creates and persists a project contract and task graph.
