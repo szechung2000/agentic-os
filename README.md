@@ -6,6 +6,14 @@ long-term semantic + episodic brain. For Simon's Georgia Tech OMSCS
 portfolio: this is the agentic OS with a Telegram interface that lets
 him talk to the system while he's working or caring for his kids.
 
+## Specification
+
+The formal design is versioned with the repository:
+
+- [Product specification](docs/product-spec.md) — vision, requirements, safety, memory, and v1 success criteria
+- [Architecture](docs/architecture.md) — runtime adapters, contracts, memory scopes, skills, approvals, and deployment
+- [Roadmap](docs/roadmap.md) — E0–E8 deliverables and acceptance tests
+
 ## Architecture
 
 ```
