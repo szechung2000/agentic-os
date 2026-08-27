@@ -25,11 +25,24 @@ class TaskResult:
     details: dict = field(default_factory=dict)
 
 
+class CancellationError(Exception):
+    """Raised when a component call is cancelled."""
+    pass
+
+
+class TimeoutError(Exception):
+    """Raised when a component call times out."""
+    pass
+
+
 class Worker:
     """Base: name + tool executor function."""
 
     name: str = "worker"
     description: str = ""
+
+    def __init__(self, tracer=None) -> None:
+        self.tracer = tracer
 
     async def run(self, task: dict[str, Any]) -> TaskResult:
         raise NotImplementedError
@@ -41,7 +54,8 @@ class MemoryWorker(Worker):
     name = "memory"
     description = "remember facts, search long-term memory, assemble context"
 
-    def __init__(self, executor: MemoryClientProtocol) -> None:
+    def __init__(self, executor: MemoryClientProtocol, tracer=None) -> None:
+        super().__init__(tracer)
         self.executor = executor
 
     async def run(self, task: dict[str, Any]) -> TaskResult:
@@ -54,8 +68,29 @@ class MemoryWorker(Worker):
         if tool is None:
             return TaskResult(self.name, False, f"unknown memory action: {action}")
         payload = {k: v for k, v in task.items() if k not in ("action", "worker")}
-        output = self.executor.execute(tool, payload)
+        if self.tracer:
+            with self.tracer.span(
+                trace_id=task.get("trace_id", "unknown"),
+                goal_id=task.get("goal_id", "memory"),
+                run_id=task.get("run_id", "memory-run"),
+                component_kind="worker",
+                component_name=self.name,
+                operation=f"worker.{self.name}.run",
+            ) as span:
+                output = self.executor.execute(tool, payload)
+                span.set_output(self._create_output_ref(output))
+        else:
+            output = self.executor.execute(tool, payload)
         return TaskResult(self.name, True, output)
+
+    def _create_output_ref(self, output: str):
+        import tempfile
+
+        from agentic_os.core.artifacts import ArtifactStore
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = ArtifactStore(tmpdir)
+            return store.put(output.encode(), "application/json")
 
 
 class EchoWorker(Worker):
@@ -64,14 +99,42 @@ class EchoWorker(Worker):
     name = "echo"
     description = "general fallback worker for tasks without a specialist"
 
+    def __init__(self, tracer=None) -> None:
+        super().__init__(tracer)
+
     async def run(self, task: dict[str, Any]) -> TaskResult:
         content = task.get("content") or task.get("query") or str(task)
-        return TaskResult(self.name, True, f"echo: {content}")
+        if self.tracer:
+            with self.tracer.span(
+                trace_id=task.get("trace_id", "unknown"),
+                goal_id=task.get("goal_id", "echo"),
+                run_id=task.get("run_id", "echo-run"),
+                component_kind="worker",
+                component_name=self.name,
+                operation=f"worker.{self.name}.run",
+            ) as span:
+                output = f"echo: {content}"
+                span.set_output(self._create_output_ref(output))
+        else:
+            output = f"echo: {content}"
+        return TaskResult(self.name, True, output)
+
+    def _create_output_ref(self, output: str):
+        import tempfile
+
+        from agentic_os.core.artifacts import ArtifactStore
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = ArtifactStore(tmpdir)
+            return store.put(output.encode(), "application/json")
 
 
-def default_workers(memory_executor: MemoryClientProtocol | None = None) -> list[Worker]:
+def default_workers(
+    memory_executor: MemoryClientProtocol | None = None,
+    tracer=None,
+) -> list[Worker]:
     workers: list[Worker] = []
     if memory_executor is not None:
-        workers.append(MemoryWorker(memory_executor))
-    workers.append(EchoWorker())
+        workers.append(MemoryWorker(memory_executor, tracer))
+    workers.append(EchoWorker(tracer))
     return workers
