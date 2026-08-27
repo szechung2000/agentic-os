@@ -187,7 +187,7 @@ Every memory records namespace, owner, project, task/run, visibility, provenance
 - **NFR-2 Isolation:** concurrent coding trials use separate worktrees or containers.
 - **NFR-3 Recoverability:** supervisor state is checkpointed so a restart can resume or clearly fail the run.
 - **NFR-4 Bounded autonomy:** configurable time, token, cost, retry, concurrency, and disk limits.
-- **NFR-5 Observability:** structured event log and human-readable run timeline.
+- **NFR-5 Observability and evaluation:** every component invocation emits correlated start/terminal events; traces are replayable, feed interaction views, and support component, integration, and end-to-end evaluations as defined in [Evaluation and Observability](evaluation-observability.md).
 - **NFR-6 Security:** secrets are injected at runtime, redacted from traces, and never written to memory or planning artifacts.
 - **NFR-7 Portability:** Docker Compose is the supported reproducible deployment; local `uv` execution remains supported.
 - **NFR-8 Regression safety:** selected changes cannot merge while required project evaluations regress.

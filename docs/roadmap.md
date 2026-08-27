@@ -24,14 +24,19 @@ This scaffold predates the formal specification. Each component must be reconcil
 
 - Pydantic models for goal, task, worker result, evaluation, artifact, approval, and event.
 - Run state machine and append-only event store.
+- Correlated component spans covering supervisor, workers, runtimes, tools, memory, skills, evaluators, interfaces, and project stores.
+- Content-addressed payload/artifact references with redaction and integrity hashes.
 - Checkpoint/restart support.
-- Structured trace CLI/API.
+- Structured trace CLI/API with tree, filter, integrity-check, and recorded replay operations.
 - Typed extension registries for runtimes, workers, tools, evaluators, planning surfaces, interfaces, memory policy, and skills.
 - Runtime presets that compose registered capabilities without supervisor branches.
 
 ### Acceptance tests
 
 - A process can stop mid-run and resume without duplicating completed work.
+- Every component call emits one start and exactly one completed/failed/cancelled/timed-out terminal event.
+- Broken parent spans, missing terminal events, or unredacted secrets fail trace-integrity checks.
+- A failed fixture can be diagnosed and replayed from recorded artifacts without live external calls.
 - Invalid worker output is rejected with a bounded correction attempt.
 - Replanning records the old plan, new plan, and reason.
 - A test provider replaces an existing capability without changing supervisor code.
@@ -106,6 +111,9 @@ This scaffold predates the formal specification. Each component must be reconcil
 - Regression gate and baseline comparison.
 - Optional versioned rubric evaluator.
 - Candidate leaderboard covering quality, latency, cost, and failures.
+- Versioned component golden suites for planning, routing, research, memory, skills, evaluation, and interaction rendering.
+- Integration and end-to-end scenario harnesses with recorded and opt-in live lanes.
+- Append-only evaluation history and baseline/candidate comparison reports.
 
 ### Acceptance tests
 
@@ -113,6 +121,9 @@ This scaffold predates the formal specification. Each component must be reconcil
 - The evaluator selects the measured winner, not the first finisher.
 - A quality gain with a forbidden regression is rejected.
 - Negative results are preserved as evidence and available to later runs.
+- Every required PR suite compares candidate and committed baseline by case tags, quality, latency, and cost.
+- A component regression can be localized from correlated spans and case artifacts.
+- Evaluator-version changes preserve historical results instead of rewriting them.
 
 ## E5 — Skills library
 

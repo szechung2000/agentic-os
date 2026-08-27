@@ -287,7 +287,7 @@ Runtime credentials mount as secrets. Docker socket access is not granted to the
 
 ## 8. Interaction observability
 
-Agent collaboration is projected from the durable run-event stream rather than collected in a separate debug log. This keeps the UI, Telegram summaries, restart recovery, and evaluations consistent.
+Agent collaboration is projected from the durable run-event stream rather than collected in a separate debug log. This keeps the UI, Telegram summaries, restart recovery, and evaluations consistent. The complete component-call envelope, correlation model, replay modes, metrics, and evaluation hierarchy are specified in [Evaluation and Observability](evaluation-observability.md).
 
 ### Interaction event envelope
 
