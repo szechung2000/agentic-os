@@ -15,6 +15,7 @@ The formal design is versioned with the repository:
 - [Roadmap](docs/roadmap.md) — E0–E8 deliverables and acceptance tests
 - [Reference architectures](docs/reference-architectures.md) — ideas adopted from DeepSeek Harness and Hermes Agent
 - [Evaluation and observability](docs/evaluation-observability.md) — component-call traces, replay, golden suites, metrics, and regression gates
+- [E0 verification](docs/e0-verification.md) — executable acceptance proof, commands, artifacts, and criterion-to-test mapping
 
 ## Architecture
 

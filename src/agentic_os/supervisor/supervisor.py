@@ -8,12 +8,32 @@ Two modes:
 
 from __future__ import annotations
 
+import contextvars
 import json
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from agentic_os.core.events import ComponentTracer
 from agentic_os.workers.base import TaskResult, Worker
+
+# Context variable to propagate trace_id across async boundaries
+current_trace_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "current_trace_id", default=None
+)
+
+
+def get_trace_id() -> str | None:
+    return current_trace_id.get()
+
+
+def set_trace_id(trace_id: str | None) -> contextvars.Token:
+    return current_trace_id.set(trace_id)
+
+
+def reset_trace_id(token: contextvars.Token) -> None:
+    current_trace_id.reset(token)
 
 
 @dataclass
@@ -44,17 +64,19 @@ class Supervisor:
         llm=None,
         model: str = "gpt-4o-mini",
         default_worker: str = "echo",
+        tracer: ComponentTracer | None = None,
     ) -> None:
         self.workers = {w.name: w for w in workers}
         self.llm = llm
         self.model = model
         self.default_worker = default_worker
+        self.tracer = tracer
         self.history: list[dict[str, str]] = []
 
     def _resolve(self, route: Route) -> Worker | None:
         return self.workers.get(route.worker_name) or self.workers.get(self.default_worker)
 
-    async def _run_llm(self, text: str) -> tuple[str, list[TaskResult]]:
+    async def _run_llm(self, text: str, trace_id: str) -> tuple[str, list[TaskResult]]:
         """LLM plans tool calls; bounded rounds like the agent-memory demo."""
         from agentic_os.tools.bridge import build_openai_tools
 
@@ -79,12 +101,39 @@ class Supervisor:
                 if worker is None:
                     result = TaskResult(tc.function.name, False, "no such worker")
                 else:
-                    result = await worker.run(args)
+                    # Wrap worker execution in tracer span
+                    if self.tracer:
+                        with self.tracer.span(
+                            trace_id=trace_id,
+                            goal_id="supervisor",
+                            run_id="supervisor-run",
+                            component_kind="worker",
+                            component_name=tc.function.name.replace("worker_", ""),
+                            operation=f"worker.{tc.function.name.replace('worker_', '')}.run",
+                            parent_span_id=None,
+                        ) as span:
+                            result = await worker.run(args)
+                            span.set_output(
+                                self._create_output_ref(result.output)
+                            )
+                    else:
+                        result = await worker.run(args)
                 task_results.append(result)
                 messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "content": result.output}
                 )
         return "(supervisor gave up after 4 rounds)", task_results
+
+    def _create_output_ref(self, output: str):
+        """Create an artifact reference for worker output."""
+        import tempfile
+
+        from agentic_os.core.artifacts import ArtifactStore
+
+        # Create a temp artifact store just for this output
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = ArtifactStore(tmpdir)
+            return store.put(output.encode(), "application/json")
 
     def _system_prompt(self) -> str:
         descs = "\n".join(f"- {w.name}: {w.description}" for w in self.workers.values())
@@ -94,10 +143,32 @@ class Supervisor:
             f"Available workers:\n{descs}"
         )
 
-    async def handle(self, text: str) -> dict[str, Any]:
+    async def handle(self, text: str, trace_id: str | None = None) -> dict[str, Any]:
         """Main entry: returns reply plus trace of what happened."""
+        # Create or use existing trace context
+        token = set_trace_id(trace_id)
+        effective_trace_id = trace_id or get_trace_id() or f"trace_{uuid.uuid4().hex}"
+        try:
+            # Wrap supervisor handling in a trace span
+            if self.tracer:
+                with self.tracer.span(
+                    trace_id=effective_trace_id,
+                    goal_id="supervisor",
+                    run_id="supervisor-run",
+                    component_kind="supervisor",
+                    component_name="supervisor",
+                    operation="supervisor.handle",
+                ):
+                    return await self._handle_impl(text, effective_trace_id)
+            else:
+                return await self._handle_impl(text, effective_trace_id)
+        finally:
+            reset_trace_id(token)
+
+    async def _handle_impl(self, text: str, trace_id: str) -> dict[str, Any]:
+        """Internal implementation without trace wrapper."""
         if self.llm is not None:
-            reply, results = await self._run_llm(text)
+            reply, results = await self._run_llm(text, trace_id)
             return {
                 "reply": reply,
                 "trace": [r.__dict__ for r in results],

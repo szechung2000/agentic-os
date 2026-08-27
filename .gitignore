@@ -5,3 +5,5 @@ __pycache__/
 
 demo/*.db
 .hermes-citation-ledger.json
+dist/
+.agos/
