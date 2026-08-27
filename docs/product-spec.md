@@ -141,6 +141,21 @@ The approval request must identify the exact target, reason, and expected effect
 
 A shared skill library shall be readable by the supervisor and all specialists. Skills include trigger conditions, procedures, commands, pitfalls, and verification steps. Workers may propose new or updated skills after successful non-trivial workflows; the supervisor validates and publishes them.
 
+### FR-11 Agent interaction visibility
+
+The user shall be able to inspect how the supervisor and specialists collaborate. The run view must show:
+
+- the supervisor's goal decomposition and delegation decisions;
+- worker identity, runtime adapter, task contract, status, and workspace;
+- messages and artifact handoffs between supervisor and workers;
+- worker-to-worker communication routed through the supervisor or a durable mailbox;
+- evidence, memory, and skill references supplied to each worker;
+- evaluator inputs, scores, regressions, and selection rationale;
+- retries, steering, cancellation, replanning, and approval pauses;
+- timestamps, latency, token/cost data when available, and links to resulting artifacts.
+
+The default presentation is a chronological run timeline with filters by worker, task, event type, and trial. A sequence/dependency view may project the same durable events. Telegram provides concise milestones plus `/status` and `/trace`; a local web view provides the full interaction history. Internal chain-of-thought is neither requested nor exposed—visibility covers explicit task contracts, messages, tool activity, evidence, and decisions.
+
 ## 6. Memory requirements
 
 agent-memory is the only memory implementation. Agentic OS owns policy and addressing, not embedding or retrieval internals.
@@ -194,7 +209,7 @@ Every memory records namespace, owner, project, task/run, visibility, provenance
 4. It dispatches at least two isolated specialist trials through headless CLI adapters.
 5. A common evaluator ranks the trials and detects regressions.
 6. It implements the winning approach, verifies it, and opens a GitHub pull request.
-7. Progress and final findings return to Telegram.
+7. Progress, agent interactions, and final findings return to Telegram and the inspectable run timeline.
 8. Shared and worker-private memories persist across a process restart.
 9. A successful workflow can be promoted to the shared skill library.
 10. A delete attempt pauses and completes only after single-use Telegram approval.

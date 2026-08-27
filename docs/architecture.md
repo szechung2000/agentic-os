@@ -285,7 +285,49 @@ Runtime credentials mount as secrets. Docker socket access is not granted to the
 - **GitHub/Drive unavailable:** retain local artifacts and retry publication idempotently.
 - **Telegram unavailable:** continue bounded active work; queue milestone reports and approvals, but never execute pending destructive actions.
 
-## 8. Security boundaries
+## 8. Interaction observability
+
+Agent collaboration is projected from the durable run-event stream rather than collected in a separate debug log. This keeps the UI, Telegram summaries, restart recovery, and evaluations consistent.
+
+### Interaction event envelope
+
+```text
+event_id, run_id, goal_id, task_id, parent_task_id,
+actor_type, actor_id, recipient_type, recipient_id,
+event_type, timestamp, summary, payload_ref,
+artifact_refs, memory_refs, skill_refs, runtime, metrics
+```
+
+Relevant event types include:
+
+```text
+supervisor.plan.created
+supervisor.task.delegated
+worker.started
+worker.message.sent
+worker.artifact.published
+worker.progress
+worker.completed
+worker.failed
+supervisor.worker.steered
+evaluator.candidate.scored
+supervisor.decision.recorded
+approval.requested
+```
+
+Workers do not communicate through hidden process-local channels. A direct worker handoff is either mediated by the supervisor or appended to a durable mailbox/event stream with an explicit sender, recipient, task, and artifact reference.
+
+### Views
+
+- **Timeline:** chronological events with expandable task contracts, messages, tool calls, and artifacts.
+- **Task graph:** goal → tasks → trials → evaluations → selected implementation.
+- **Sequence view:** supervisor/worker lifelines and handoffs generated from the same events.
+- **Trial comparison:** candidates, runtime/model, metrics, regressions, evidence, and verdict.
+- **Telegram:** milestone summaries, `/status`, and paginated `/trace`; destructive approvals remain actionable messages.
+
+The UI exposes explicit reasoning products—plans, hypotheses, evidence, evaluations, and decision records—but does not expose private chain-of-thought.
+
+## 9. Security boundaries
 
 - Secrets are never placed in prompts unless a tool requires them and the adapter supports secret-safe injection.
 - Workers receive least-privilege credentials and repository scopes.

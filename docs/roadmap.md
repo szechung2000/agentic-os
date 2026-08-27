@@ -146,6 +146,8 @@ This scaffold predates the formal specification. Each component must be reconcil
 - Approval buttons for delete/remove/force-rewrite operations.
 - Single-use, expiring, operation-hashed approval tokens.
 - `/status`, `/pause`, `/resume`, `/stop`, and run-link commands.
+- `/trace` with paginated supervisor/worker interactions and artifact links.
+- Local web timeline, task graph, sequence view, and trial comparison sourced from durable run events.
 
 ### Acceptance tests
 
@@ -153,6 +155,10 @@ This scaffold predates the formal specification. Each component must be reconcil
 - Approval executes only the displayed operation once.
 - Modified or expired operations require new approval.
 - Loss of Telegram connectivity never implicitly approves an action.
+- A user can trace goal → delegation → worker handoff → evaluation → decision without reading process logs.
+- Timeline and sequence views reconstruct the same interaction ordering from the event store.
+- Worker messages identify sender, recipient, task, runtime, and referenced artifacts.
+- No view exposes private chain-of-thought; it exposes explicit plans, evidence, tool activity, and decision records.
 
 ## E7 — Local and Docker deployment
 
