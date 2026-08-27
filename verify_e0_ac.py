@@ -6,7 +6,6 @@ Checks whether the codebase satisfies roadmap.md E0 acceptance criteria
 (lines 34-44) and reports any gaps. Pure verification — no code changes.
 """
 
-import ast
 import re
 import sys
 from pathlib import Path
@@ -15,15 +14,27 @@ ROOT = Path("/opt/data/agentic-os")
 
 ACCEPTANCE_CRITERIA = {
     "AC-1": "Process stops mid-run and resumes without duplicating completed work",
-    "AC-2": "Every component call emits one start and exactly one completed/failed/cancelled/timed-out terminal event",
-    "AC-3": "Broken parent spans, missing terminal events, or unredacted secrets fail trace-integrity checks",
-    "AC-4": "A failed fixture can be diagnosed and replayed from recorded artifacts without live external calls",
+    "AC-2": (
+        "Every component call emits one start and exactly one "
+        "completed/failed/cancelled/timed-out terminal event"
+    ),
+    "AC-3": (
+        "Broken parent spans, missing terminal events, or unredacted "
+        "secrets fail trace-integrity checks"
+    ),
+    "AC-4": (
+        "A failed fixture can be diagnosed and replayed from recorded "
+        "artifacts without live external calls"
+    ),
     "AC-5": "Invalid worker output is rejected with a bounded correction attempt",
     "AC-6": "Replanning records the old plan, new plan, and reason",
     "AC-7": "A test provider replaces an existing capability without changing supervisor code",
     "AC-8": "Every model-visible context item is reconstructable from its recorded provenance",
     "AC-9": "Unregistering an extension reverses its registrations and releases owned resources",
-    "AC-10": "Every model-visible context item is reconstructable from its recorded provenance",  # duplicate, skip
+    "AC-10": (
+        "Every model-visible context item is reconstructable from its "
+        "recorded provenance"
+    ),  # duplicate, skip
 }
 
 TEST_FILES = [
@@ -224,7 +235,15 @@ def main():
             func = AC_FUNCTION[ac_id]
             result = func(all_text)
             status = "✅" if result["supported"] else "❌"
-            results.append((ac_id, status, result["supported"], result["findings"], ACCEPTANCE_CRITERIA.get(ac_id, "")))
+            results.append(
+                (
+                    ac_id,
+                    status,
+                    result["supported"],
+                    result["findings"],
+                    ACCEPTANCE_CRITERIA.get(ac_id, ""),
+                )
+            )
 
     print("AC | Status | Findings")
     print("-" * 70)
@@ -234,7 +253,7 @@ def main():
         for f in findings:
             print(f"    - {f}")
         if not findings:
-            print(f"    (no evidence found)")
+            print("    (no evidence found)")
         if not supported:
             all_ok = False
         print()
