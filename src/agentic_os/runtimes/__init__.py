@@ -42,6 +42,7 @@ from agentic_os.runtimes.routing import (
     RuntimeRouter,
     StartedRuntime,
 )
+from agentic_os.runtimes.worker_bridge import RuntimeWorkerBridge
 
 __all__ = [
     "AgyAdapter",
@@ -82,4 +83,5 @@ __all__ = [
     "RuntimeRouteFailure",
     "RuntimeRouter",
     "StartedRuntime",
+    "RuntimeWorkerBridge",
 ]
