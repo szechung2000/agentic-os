@@ -23,7 +23,7 @@ import json
 import math
 import os
 import signal
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, TypeAlias, runtime_checkable
 
@@ -554,6 +554,28 @@ class SubprocessRuntimeAdapter:
             RuntimeStatus.TIMED_OUT: RuntimeEventType.TIMED_OUT,
             RuntimeStatus.UNAVAILABLE: RuntimeEventType.FAILED,
         }[status]
+
+
+def build_allowlisted_environment(
+    allowed_names: Iterable[str],
+    *,
+    source: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Build a child-process environment from an explicit name allowlist.
+
+    ``source`` defaults to ``os.environ`` but is never copied wholesale: only
+    ``PATH`` (needed to locate the executable) and names in ``allowed_names``
+    are forwarded.  Provider adapters use this to keep unrelated secrets in
+    the caller's environment out of the child process, traces, and artifacts.
+    """
+    src = os.environ if source is None else source
+    environment = {"PATH": src.get("PATH", os.defpath)}
+    for name in allowed_names:
+        if name == "PATH":
+            continue
+        if name in src:
+            environment[name] = src[name]
+    return environment
 
 
 def subprocess_creationflags() -> int:
