@@ -10,6 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from agentic_os.core.artifacts import ArtifactStore
+from agentic_os.core.events import ComponentCancelledError, ComponentTimedOutError
+
 
 class MemoryClientProtocol(Protocol):
     """Subset of the agent-memory client the memory worker needs."""
@@ -25,14 +28,12 @@ class TaskResult:
     details: dict = field(default_factory=dict)
 
 
-class CancellationError(Exception):
+class CancellationError(ComponentCancelledError):
     """Raised when a component call is cancelled."""
-    pass
 
 
-class TimeoutError(Exception):
+class TimeoutError(ComponentTimedOutError):
     """Raised when a component call times out."""
-    pass
 
 
 class Worker:
@@ -41,8 +42,15 @@ class Worker:
     name: str = "worker"
     description: str = ""
 
-    def __init__(self, tracer=None) -> None:
+    def __init__(self, tracer=None, artifacts: ArtifactStore | None = None) -> None:
         self.tracer = tracer
+        self.artifacts = artifacts or getattr(tracer, "artifacts", None)
+
+    def _create_output_ref(self, output: str):
+        """Persist trace output only when the caller supplied a durable store."""
+        if self.artifacts is None:
+            return None
+        return self.artifacts.put(output.encode(), "application/json")
 
     async def run(self, task: dict[str, Any]) -> TaskResult:
         raise NotImplementedError
@@ -54,8 +62,13 @@ class MemoryWorker(Worker):
     name = "memory"
     description = "remember facts, search long-term memory, assemble context"
 
-    def __init__(self, executor: MemoryClientProtocol, tracer=None) -> None:
-        super().__init__(tracer)
+    def __init__(
+        self,
+        executor: MemoryClientProtocol,
+        tracer=None,
+        artifacts: ArtifactStore | None = None,
+    ) -> None:
+        super().__init__(tracer, artifacts)
         self.executor = executor
 
     async def run(self, task: dict[str, Any]) -> TaskResult:
@@ -78,20 +91,12 @@ class MemoryWorker(Worker):
                 operation=f"worker.{self.name}.run",
             ) as span:
                 output = self.executor.execute(tool, payload)
-                span.set_output(self._create_output_ref(output))
+                output_ref = self._create_output_ref(output)
+                if output_ref is not None:
+                    span.set_output(output_ref)
         else:
             output = self.executor.execute(tool, payload)
         return TaskResult(self.name, True, output)
-
-    def _create_output_ref(self, output: str):
-        import tempfile
-
-        from agentic_os.core.artifacts import ArtifactStore
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(tmpdir)
-            return store.put(output.encode(), "application/json")
-
 
 class EchoWorker(Worker):
     """Demo/general-purpose fallback: returns the task payload. No external deps."""
@@ -99,8 +104,8 @@ class EchoWorker(Worker):
     name = "echo"
     description = "general fallback worker for tasks without a specialist"
 
-    def __init__(self, tracer=None) -> None:
-        super().__init__(tracer)
+    def __init__(self, tracer=None, artifacts: ArtifactStore | None = None) -> None:
+        super().__init__(tracer, artifacts)
 
     async def run(self, task: dict[str, Any]) -> TaskResult:
         content = task.get("content") or task.get("query") or str(task)
@@ -114,27 +119,20 @@ class EchoWorker(Worker):
                 operation=f"worker.{self.name}.run",
             ) as span:
                 output = f"echo: {content}"
-                span.set_output(self._create_output_ref(output))
+                output_ref = self._create_output_ref(output)
+                if output_ref is not None:
+                    span.set_output(output_ref)
         else:
             output = f"echo: {content}"
         return TaskResult(self.name, True, output)
 
-    def _create_output_ref(self, output: str):
-        import tempfile
-
-        from agentic_os.core.artifacts import ArtifactStore
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(tmpdir)
-            return store.put(output.encode(), "application/json")
-
-
 def default_workers(
     memory_executor: MemoryClientProtocol | None = None,
     tracer=None,
+    artifacts: ArtifactStore | None = None,
 ) -> list[Worker]:
     workers: list[Worker] = []
     if memory_executor is not None:
-        workers.append(MemoryWorker(memory_executor, tracer))
-    workers.append(EchoWorker(tracer))
+        workers.append(MemoryWorker(memory_executor, tracer, artifacts))
+    workers.append(EchoWorker(tracer, artifacts))
     return workers

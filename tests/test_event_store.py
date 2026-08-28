@@ -81,15 +81,17 @@ def test_integrity_rejects_missing_terminal_and_broken_parent(tmp_path):
     assert "unknown parent" in str(exc.value)
 
 
-def test_integrity_rejects_secret_like_event_payload(tmp_path):
+def test_event_store_redacts_secret_like_event_payload_before_persistence(tmp_path):
     store = EventStore(tmp_path / "events.db")
     started = event("component.call.started", "span_1")
-    # Set secret before append so redaction happens
+    # The event store is the durable persistence boundary.
     started.error = {"debug": "ANTHROPIC_API_KEY=sk-ant-secret123"}
     store.append(started)
     store.append(event("component.call.completed", "span_1"))
-    with pytest.raises(TraceIntegrityError, match="secret-like"):
-        store.verify_trace("trace_1")
+    persisted = store.query(trace_id="trace_1")[0]
+    assert "secret123" not in persisted.model_dump_json()
+    assert "[REDACTED]" in persisted.model_dump_json()
+    assert store.verify_trace("trace_1").ok
 
 
 def test_artifact_store_roundtrip_and_deduplicates(tmp_path):
