@@ -24,7 +24,8 @@ class ExtensionKind(StrEnum):
 class RuntimePreset(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1)
-    capabilities: dict[ExtensionKind, str]
+    capabilities: dict[ExtensionKind, str] = Field(default_factory=dict)
+    runtime_candidates: tuple[str, ...] = ()
     policy: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -32,6 +33,7 @@ class RuntimePreset(BaseModel):
 class ResolvedPreset:
     name: str
     capabilities: dict[ExtensionKind, Any]
+    runtime_candidates: tuple[tuple[str, Any], ...]
     policy: dict[str, Any]
 
 
@@ -83,8 +85,20 @@ class ExtensionRegistry:
         return ResolvedPreset(
             name=preset.name,
             capabilities=capabilities,
+            runtime_candidates=self.resolve_ordered(
+                ExtensionKind.RUNTIME, preset.runtime_candidates
+            ),
             policy=dict(preset.policy),
         )
+
+    def resolve_ordered(
+        self, kind: ExtensionKind, names: tuple[str, ...] | list[str]
+    ) -> tuple[tuple[str, Any], ...]:
+        """Resolve caller-specified candidates without deriving an order here."""
+        ordered_names = tuple(names)
+        if len(ordered_names) != len(set(ordered_names)):
+            raise ValueError(f"duplicate {kind.value} candidate")
+        return tuple((name, self.resolve(kind, name)) for name in ordered_names)
 
     def available(self, kind: ExtensionKind) -> tuple[str, ...]:
         names = (

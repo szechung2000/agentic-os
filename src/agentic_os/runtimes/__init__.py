@@ -32,6 +32,16 @@ from agentic_os.runtimes.contracts import (
     Workspace,
     WorkspaceWritePolicy,
 )
+from agentic_os.runtimes.discovery import RuntimeDiscovery, RuntimeProbeOutput, RuntimeProbeSpec
+from agentic_os.runtimes.routing import (
+    PreStartRouteDecision,
+    PreStartRouteResult,
+    RouteFailureCode,
+    RuntimeRouteAttempt,
+    RuntimeRouteFailure,
+    RuntimeRouter,
+    StartedRuntime,
+)
 
 __all__ = [
     "AgyAdapter",
@@ -62,4 +72,14 @@ __all__ = [
     "RuntimeTraceFields",
     "Workspace",
     "WorkspaceWritePolicy",
+    "RuntimeDiscovery",
+    "RuntimeProbeOutput",
+    "RuntimeProbeSpec",
+    "PreStartRouteDecision",
+    "PreStartRouteResult",
+    "RouteFailureCode",
+    "RuntimeRouteAttempt",
+    "RuntimeRouteFailure",
+    "RuntimeRouter",
+    "StartedRuntime",
 ]
