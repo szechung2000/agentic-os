@@ -47,6 +47,8 @@ This scaffold predates the formal specification. Each component must be reconcil
 
 **Goal:** Execute specialist tasks through interchangeable agent CLIs.
 
+**Status:** Complete on `feat/e1-runtime-adapters` pending merge.
+
 ### Deliverables
 
 - `RuntimeAdapter` interface.
@@ -62,6 +64,16 @@ This scaffold predates the formal specification. Each component must be reconcil
 - Missing CLI or authentication yields a typed availability failure and fallback.
 - A timed-out worker is terminated with partial artifacts preserved.
 - Adapter selection and exact runtime/model are recorded in the trace.
+
+### E1 verification
+
+```bash
+uv run agos eval e1 --workdir /tmp/agentic-os-e1
+```
+
+The credential-free proof covers Claude, Codex, and agy-shaped fake CLIs,
+pre-start fallback, workspace policy enforcement, timeout lifecycle, durable
+artifacts, the legacy worker bridge, and trace integrity.
 
 ## E2 — Memory scopes and lifecycle
 
