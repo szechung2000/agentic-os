@@ -15,6 +15,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from agentic_os.core.artifacts import ArtifactStore
 from agentic_os.core.events import ComponentTracer
 from agentic_os.workers.base import TaskResult, Worker
 
@@ -65,12 +66,14 @@ class Supervisor:
         model: str = "gpt-4o-mini",
         default_worker: str = "echo",
         tracer: ComponentTracer | None = None,
+        artifacts: ArtifactStore | None = None,
     ) -> None:
         self.workers = {w.name: w for w in workers}
         self.llm = llm
         self.model = model
         self.default_worker = default_worker
         self.tracer = tracer
+        self.artifacts = artifacts or getattr(tracer, "artifacts", None)
         self.history: list[dict[str, str]] = []
 
     def _resolve(self, route: Route) -> Worker | None:
@@ -113,9 +116,9 @@ class Supervisor:
                             parent_span_id=None,
                         ) as span:
                             result = await worker.run(args)
-                            span.set_output(
-                                self._create_output_ref(result.output)
-                            )
+                            output_ref = self._create_output_ref(result.output)
+                            if output_ref is not None:
+                                span.set_output(output_ref)
                     else:
                         result = await worker.run(args)
                 task_results.append(result)
@@ -125,15 +128,10 @@ class Supervisor:
         return "(supervisor gave up after 4 rounds)", task_results
 
     def _create_output_ref(self, output: str):
-        """Create an artifact reference for worker output."""
-        import tempfile
-
-        from agentic_os.core.artifacts import ArtifactStore
-
-        # Create a temp artifact store just for this output
-        with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(tmpdir)
-            return store.put(output.encode(), "application/json")
+        """Persist worker output in the caller-provided durable artifact store."""
+        if self.artifacts is None:
+            return None
+        return self.artifacts.put(output.encode(), "application/json")
 
     def _system_prompt(self) -> str:
         descs = "\n".join(f"- {w.name}: {w.description}" for w in self.workers.values())

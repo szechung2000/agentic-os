@@ -80,3 +80,17 @@ def test_preset_fails_loud_on_missing_capability():
     )
     with pytest.raises(KeyError, match="missing"):
         registry.compose(preset)
+
+
+def test_runtime_preset_preserves_explicit_runtime_candidate_order():
+    registry = ExtensionRegistry()
+    first = Provider("first")
+    second = Provider("second")
+    registry.register(ExtensionKind.RUNTIME, "zeta", first)
+    registry.register(ExtensionKind.RUNTIME, "alpha", second)
+
+    resolved = registry.compose(
+        RuntimePreset(name="coding", runtime_candidates=("zeta", "alpha"))
+    )
+
+    assert resolved.runtime_candidates == (("zeta", first), ("alpha", second))

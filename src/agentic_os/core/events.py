@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import sqlite3
 import time
 from collections.abc import Iterator
@@ -12,7 +11,9 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from agentic_os.core.artifacts import ArtifactStore
 from agentic_os.core.contracts import ArtifactRef, ComponentKind, RunEvent
+from agentic_os.core.redaction import SECRET_PATTERNS, redact_text, redact_value
 
 _TERMINAL_TYPES = {
     "component.call.completed",
@@ -20,15 +21,19 @@ _TERMINAL_TYPES = {
     "component.call.cancelled",
     "component.call.timed_out",
 }
-_SECRET_PATTERNS = (
-    re.compile(r"(?i)(?:api[_-]?key|token|secret|password)\s*[=:]\s*[^\s\"']+"),
-    re.compile(r"\bsk-(?:ant-)?[A-Za-z0-9_-]{6,}"),
-    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-)
+_SECRET_PATTERNS = SECRET_PATTERNS
 
 
 class TraceIntegrityError(ValueError):
     pass
+
+
+class ComponentCancelledError(Exception):
+    """A component stopped before it could produce a normal result."""
+
+
+class ComponentTimedOutError(TimeoutError):
+    """A component exceeded its caller-enforced execution deadline."""
 
 
 @dataclass(frozen=True)
@@ -44,16 +49,36 @@ class SpanHandle:
     span_id: str
     output_ref: ArtifactRef | None = None
     metrics: dict[str, float | int | None] | None = None
+    artifacts: ArtifactStore | None = None
+    terminal_status: str | None = None
+    terminal_error: dict[str, str] | None = None
 
     def set_output(self, ref: ArtifactRef) -> None:
         self.output_ref = ref
+
+    def record_output(self, content: bytes, *, media_type: str) -> ArtifactRef:
+        """Persist output through the caller-provided durable artifact store."""
+        if self.artifacts is None:
+            raise RuntimeError("ComponentTracer requires an ArtifactStore to record output")
+        ref = self.artifacts.put(content, media_type)
+        self.set_output(ref)
+        return ref
+
+    def mark_cancelled(self, message: str = "component cancelled") -> None:
+        self.terminal_status = "cancelled"
+        self.terminal_error = {"type": "CancellationError", "message": redact_text(message)}
+
+    def mark_timed_out(self, message: str = "component timed out") -> None:
+        self.terminal_status = "timed_out"
+        self.terminal_error = {"type": "TimeoutError", "message": redact_text(message)}
 
 
 class ComponentTracer:
     """Guarantees one start and one terminal event around a component call."""
 
-    def __init__(self, store: EventStore) -> None:
+    def __init__(self, store: EventStore, artifacts: ArtifactStore | None = None) -> None:
         self.store = store
+        self.artifacts = artifacts
 
     @contextmanager
     def span(
@@ -90,56 +115,69 @@ class ComponentTracer:
         self.store.append(
             RunEvent(event_type="component.call.started", status="running", **common)
         )
-        handle = SpanHandle(span_id=span_id)
+        handle = SpanHandle(span_id=span_id, artifacts=self.artifacts)
         started = time.perf_counter()
         try:
             yield handle
         except BaseException as error:
-            elapsed = (time.perf_counter() - started) * 1000
-            message = _redact_text(str(error))
-            self.store.append(
-                RunEvent(
-                    event_type="component.call.failed",
-                    status="failed",
-                    metrics={"latency_ms": round(elapsed, 3)},
-                    output_ref=handle.output_ref,
-                    error={"type": type(error).__name__, "message": message},
-                    **common,
-                )
-            )
+            self._append_terminal(handle, common, started, error=error)
             raise
         else:
-            elapsed = (time.perf_counter() - started) * 1000
-            metrics = dict(handle.metrics or {})
-            metrics.setdefault("latency_ms", round(elapsed, 3))
-            self.store.append(
-                RunEvent(
-                    event_type="component.call.completed",
-                    status="ok",
-                    output_ref=handle.output_ref,
-                    metrics=metrics,
-                    **common,
-                )
+            self._append_terminal(handle, common, started)
+
+    def _append_terminal(
+        self,
+        handle: SpanHandle,
+        common: dict[str, Any],
+        started: float,
+        *,
+        error: BaseException | None = None,
+    ) -> None:
+        elapsed = (time.perf_counter() - started) * 1000
+        metrics = dict(handle.metrics or {})
+        metrics.setdefault("latency_ms", round(elapsed, 3))
+        status = handle.terminal_status
+        terminal_error = handle.terminal_error
+        if error is not None:
+            if (
+                isinstance(error, ComponentCancelledError)
+                or type(error).__name__ == "CancellationError"
+            ):
+                status = "cancelled"
+                terminal_error = {"type": "CancellationError", "message": redact_text(str(error))}
+            elif isinstance(error, (TimeoutError, ComponentTimedOutError)):
+                status = "timed_out"
+                terminal_error = {"type": "TimeoutError", "message": redact_text(str(error))}
+            else:
+                status = "failed"
+                terminal_error = {"type": type(error).__name__, "message": redact_text(str(error))}
+        if status is None:
+            status = "ok"
+        event_type = {
+            "ok": "component.call.completed",
+            "failed": "component.call.failed",
+            "cancelled": "component.call.cancelled",
+            "timed_out": "component.call.timed_out",
+        }[status]
+        self.store.append(
+            RunEvent(
+                event_type=event_type,
+                status=status,
+                output_ref=handle.output_ref,
+                metrics=metrics,
+                error=terminal_error,
+                **common,
             )
+        )
 
 
 def _redact_dict(obj: Any) -> Any:
     """Recursively redact secrets from dicts, lists, and strings."""
-    if isinstance(obj, dict):
-        return {k: _redact_dict(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_redact_dict(v) for v in obj]
-    elif isinstance(obj, str):
-        return _redact_text(obj)
-    else:
-        return obj
+    return redact_value(obj)
 
 
 def _redact_text(text: str) -> str:
-    redacted = text
-    for pattern in _SECRET_PATTERNS:
-        redacted = pattern.sub("[REDACTED]", redacted)
-    return redacted
+    return redact_text(text)
 
 
 class EventStore:
@@ -195,6 +233,13 @@ class EventStore:
             )
 
     def append(self, event: RunEvent) -> int:
+            event = event.model_copy(
+                update={
+                    "data": _redact_dict(event.data),
+                    "error": _redact_dict(event.error),
+                    "source_urls": _redact_dict(event.source_urls),
+                }
+            )
             payload = event.model_dump_json()
             with self._connect() as conn:
                 cursor = conn.execute(

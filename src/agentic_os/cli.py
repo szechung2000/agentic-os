@@ -104,6 +104,19 @@ def cmd_eval_e0(args: argparse.Namespace) -> int:
     return 0 if proof.run.score == 1.0 else 1
 
 
+def cmd_eval_e1(args: argparse.Namespace) -> int:
+    from agentic_os.evals.e1 import run_e1_proof
+
+    proof = run_e1_proof(args.workdir, candidate=args.candidate)
+    passed = sum(case.passed for case in proof.run.cases)
+    print(f"E1 score: {passed}/{len(proof.run.cases)} ({proof.run.score:.0%})")
+    for case in proof.run.cases:
+        print(f"- {case.case_id}: {'PASS' if case.passed else 'FAIL'} {case.metrics}")
+    print(f"trace={proof.trace_id}")
+    print(f"eval_history={proof.history_path}")
+    return 0 if proof.run.score == 1.0 else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agos", description="agentic OS")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -145,6 +158,10 @@ def main(argv: list[str] | None = None) -> int:
     p_e0.add_argument("--workdir", default="./.agos/evals/e0")
     p_e0.add_argument("--candidate", default="working-tree")
     p_e0.set_defaults(func=cmd_eval_e0)
+    p_e1 = eval_sub.add_parser("e1", help="run executable E1 runtime-adapter proof")
+    p_e1.add_argument("--workdir", default="./.agos/evals/e1")
+    p_e1.add_argument("--candidate", default="working-tree")
+    p_e1.set_defaults(func=cmd_eval_e1)
 
     args = parser.parse_args(argv)
     return args.func(args)

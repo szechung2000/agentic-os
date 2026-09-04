@@ -76,6 +76,22 @@ The first two lines show the memory worker storing and then retrieving
 through the real agent-memory pipeline; the third line is the echo
 fallback.
 
+## E1: headless runtime adapter demo
+
+E1 provides interchangeable headless runtime adapters for Claude Code, Codex,
+and agy. Run the deterministic demo without API keys, network access, or the
+real provider CLIs:
+
+```bash
+uv run agos eval e1 --workdir /tmp/agentic-os-e1
+```
+
+The proof exercises native-shaped provider output parsing, explicit fallback,
+workspace policy checks, timeout handling, partial artifacts, runtime trace
+metadata, and compatibility with the existing worker boundary. See
+[`docs/e1-verification.md`](docs/e1-verification.md) for the opt-in real CLI
+lane and safety constraints.
+
 ## Tests
 
 ```bash
