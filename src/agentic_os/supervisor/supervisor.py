@@ -203,8 +203,11 @@ class Supervisor:
         if isinstance(parsed, list):  # memory_search hits
             lines = []
             for h in parsed[:3]:
-                score = h.get("score", 0)
-                lines.append(f"- ({score:.2f}) {h['content'][:140]}")
+                score = h.get("score")
+                if score is None:
+                    score = h.get("memory_score") or 0
+                content = h.get("content") or h.get("summary", "")
+                lines.append(f"- ({score:.2f}) {content[:140]}")
             return "\n".join(lines) if lines else "Nothing found in memory."
         if isinstance(parsed, dict) and parsed.get("status") == "remembered":
             return "Remembered."

@@ -65,14 +65,36 @@ class RunCoordinator:
         self.events = events
         self._states: dict[str, RunState] = {}
 
-    def create(self, goal: GoalContract) -> RunState:
-        run_id = f"run_{uuid4().hex}"
-        trace_id = f"trace_{uuid4().hex}"
+    def create(
+        self,
+        goal: GoalContract,
+        *,
+        run_id: str | None = None,
+        trace_id: str | None = None,
+    ) -> RunState:
+        """Create a durable run, optionally using validated entry-point IDs."""
+        run_id = run_id or f"run_{uuid4().hex}"
+        trace_id = trace_id or f"trace_{uuid4().hex}"
+        try:
+            self.load(run_id)
+        except KeyError:
+            pass
+        else:
+            raise ValueError(f"run already exists: {run_id}")
         state = RunState(run_id=run_id, trace_id=trace_id, goal=goal)
         payload = {"goal": goal.model_dump(mode="json")}
         self.events.append(self._event(state, "run.created", payload))
         self._states[run_id] = state
         return state.model_copy(deep=True)
+
+    def is_run_active(self, run_id: str) -> bool:
+        """Whether durable state permits short-term memory read/write/hydration."""
+        return self.load(run_id).status in {
+            RunStatus.RECEIVED,
+            RunStatus.PLANNING,
+            RunStatus.RUNNING,
+            RunStatus.PAUSED,
+        }
 
     def load(self, run_id: str) -> RunState:
         checkpoint = self.events.load_checkpoint(run_id)

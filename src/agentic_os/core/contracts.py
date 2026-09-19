@@ -58,6 +58,28 @@ class ContextItem(Contract):
     provenance_type: Literal["event", "memory", "skill", "source", "artifact"]
     provenance_id: str = Field(min_length=1)
     content_hash: str | None = Field(default=None, pattern=r"^sha256:")
+    memory_namespace: str | None = None
+    memory_kind: Literal["semantic", "episodic"] | None = None
+    memory_metadata: dict[str, Any] | None = None
+    memory_score: float | None = None
+    memory_created_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def require_memory_provenance_fields(self) -> ContextItem:
+        if self.provenance_type == "memory":
+            required = {
+                "content_hash": self.content_hash,
+                "memory_namespace": self.memory_namespace,
+                "memory_kind": self.memory_kind,
+                "memory_metadata": self.memory_metadata,
+                "memory_created_at": self.memory_created_at,
+            }
+            missing = [name for name, value in required.items() if value is None]
+            if missing:
+                raise ValueError(
+                    "memory provenance requires " + ", ".join(missing)
+                )
+        return self
 
 
 class TaskContract(Contract):

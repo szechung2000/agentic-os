@@ -14,11 +14,22 @@ def test_context_item_requires_reconstructable_provenance():
     with pytest.raises(ValidationError):
         ContextItem(summary="Important project context", provenance_type="memory", provenance_id="")
 
+    with pytest.raises(ValidationError):
+        ContextItem(
+            summary="memory provenance without storage details",
+            provenance_type="memory",
+            provenance_id="memory_42",
+            content_hash="sha256:abc",
+        )
     item = ContextItem(
         summary="User requires no golden regressions",
         provenance_type="memory",
         provenance_id="memory_42",
         content_hash="sha256:abc",
+        memory_namespace="user/user-1",
+        memory_kind="semantic",
+        memory_metadata={},
+        memory_created_at="2026-09-19T00:00:00Z",
     )
     assert item.provenance_id == "memory_42"
 
