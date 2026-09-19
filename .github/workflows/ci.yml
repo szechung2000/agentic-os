@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - name: Check out pinned agent-memory contract
         uses: actions/checkout@v4
         with:
@@ -38,7 +38,7 @@ jobs:
           ref: 494610f548b151cd38aa98e573f90774efbb6e73
       - uses: astral-sh/setup-uv@v4
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - name: Pinned unit and golden regression gate
         run: |
           uv sync --all-groups --extra local-embeddings

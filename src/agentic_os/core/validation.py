@@ -11,7 +11,7 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 Correction = Callable[[ValidationError, Any], Any]
 
 
-def validate_with_correction(
+def validate_with_correction[ModelT: BaseModel](
     model: type[ModelT],
     raw: Any,
     *,

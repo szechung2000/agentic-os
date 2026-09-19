@@ -25,7 +25,7 @@ import os
 import signal
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Protocol, TypeAlias, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from agentic_os.core.artifacts import ArtifactStore
 from agentic_os.core.contracts import TaskContract
@@ -42,8 +42,8 @@ from agentic_os.runtimes.contracts import (
     Workspace,
 )
 
-Command: TypeAlias = Sequence[str]
-CommandBuilder: TypeAlias = Callable[[TaskContract, Workspace], Command | Awaitable[Command]]
+type Command = Sequence[str]
+type CommandBuilder = Callable[[TaskContract, Workspace], Command | Awaitable[Command]]
 
 _TERMINAL_STATUSES = frozenset(
     {
