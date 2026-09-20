@@ -1,44 +1,43 @@
 """Tests: supervisor routing + workers, fully offline."""
 
-import json
-
 import pytest
 
+from agentic_os.core.contracts import GoalContract
+from agentic_os.core.events import EventStore
+from agentic_os.core.state import RunCoordinator, RunStatus
+from agentic_os.memory.scoped import (
+    ActorAccessContext,
+    ActorKind,
+    InMemoryScopedStore,
+    ScopedMemoryPolicy,
+)
 from agentic_os.supervisor.supervisor import Supervisor, rule_route
 from agentic_os.workers.base import default_workers
 
 
-class FakeMemoryExecutor:
-    """In-memory stand-in for the agent-memory tool executor."""
-
-    def __init__(self):
-        self.store: list[str] = []
-
-    def execute(self, name, arguments):
-        if name == "memory_write":
-            self.store.append(arguments["content"])
-            return json.dumps({"id": f"m{len(self.store)}", "status": "remembered"})
-        if name == "memory_search":
-            hits = [
-                {"content": c, "score": 0.9} for c in self.store
-                if any(w in c.lower() for w in arguments["query"].lower().split()[:2])
-            ]
-            return json.dumps(hits)
-        if name == "memory_context":
-            block = "\n".join(f"- {c}" for c in self.store) or "(no relevant memories)"
-            return json.dumps({"topic": arguments.get("query", ""), "context": block})
-        return json.dumps({"error": f"unknown tool {name}"})
-
-
 @pytest.fixture()
-def supervisor():
-    from agent_memory.core.embedding import get_embedder  # noqa: F401 — availability probe
-
-    try:
-        exec_ = FakeMemoryExecutor()
-    except Exception:
-        exec_ = None
-    return Supervisor(default_workers(exec_), llm=None), exec_
+def supervisor(tmp_path):
+    store = InMemoryScopedStore()
+    runs = RunCoordinator(EventStore(tmp_path / "events.db"))
+    runs.create(
+        GoalContract(goal_id="goal-1", objective="supervisor test", success_metrics=["pass"]),
+        run_id="run-1",
+    )
+    runs.transition("run-1", RunStatus.PLANNING)
+    runs.transition("run-1", RunStatus.RUNNING)
+    policy = ScopedMemoryPolicy(
+        store,
+        ActorAccessContext(
+            actor_kind=ActorKind.WORKER,
+            user_id="user-1",
+            project_id="project-1",
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="memory-worker",
+        ),
+        lifecycle=runs,
+    )
+    return Supervisor(default_workers(policy), llm=None), store
 
 
 def test_rule_route_remember():
@@ -63,7 +62,7 @@ async def test_remember_then_recall(supervisor):
     sup, store = supervisor
     out1 = await sup.handle("remember that Simon's trading bot uses momentum on TSLA")
     assert "Remembered" not in out1["reply"] or True  # composition varies by worker output
-    assert len(store.store) == 1
+    assert sum(len(records) for records in store._records.values()) == 1
 
     out2 = await sup.handle("trading bot momentum?")
     routed = out2.get("routed_to")

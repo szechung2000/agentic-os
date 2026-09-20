@@ -79,12 +79,30 @@ artifacts, the legacy worker bridge, and trace integrity.
 
 **Goal:** Use agent-memory for scoped, durable orchestration context.
 
+**Status:** E2A scoped-memory hydration is complete with production scoped
+worker wiring, durable lifecycle gating, and a pinned HTTP/ASGI restart proof. E2B reflection and
+promotion automation, E2C tokenizer-aware budgets and lifecycle metrics, and
+physical TTL cleanup remain follow-up work owned by agent-memory.
+
 ### Deliverables
 
 - Namespace mapping for user, project shared, supervisor, worker-private, and run-short-term memory.
 - Hydration policy and context-budget allocator.
 - Episodic write path, reflection, consolidation, TTL expiry, and provenance.
 - Memory visibility enforcement.
+
+### E2A delivered
+
+- Validated canonical namespace mapping and immutable actor access context.
+- Authorize-before-backend policy for user, shared, supervisor-private,
+  worker-private, and current-run scopes; workers have read-only shared access.
+- Transport-neutral store protocol, pinned agent-memory HTTP adapter,
+  provenance-bearing budgeted hydration, and expiry filtering. The raw executor
+  compatibility path was removed so custom supervisors cannot bypass policy.
+- `ScopedMemoryWorker` production wiring for CLI/Telegram with frozen validated
+  single-user defaults and durable RunCoordinator lifecycle checks.
+- `agos eval e2` proof and ASGI tests using a fresh pinned FastAPI service,
+  TestClient, HTTP store, policy, and RunCoordinator against persistent SQLite.
 
 ### Acceptance tests
 

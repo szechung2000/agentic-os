@@ -6,7 +6,7 @@ import sqlite3
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -52,6 +52,7 @@ class SpanHandle:
     artifacts: ArtifactStore | None = None
     terminal_status: str | None = None
     terminal_error: dict[str, str] | None = None
+    memory_ids: list[str] = field(default_factory=list)
 
     def set_output(self, ref: ArtifactRef) -> None:
         self.output_ref = ref
@@ -71,6 +72,10 @@ class SpanHandle:
     def mark_timed_out(self, message: str = "component timed out") -> None:
         self.terminal_status = "timed_out"
         self.terminal_error = {"type": "TimeoutError", "message": redact_text(message)}
+
+    def add_memory_ids(self, memory_ids: Iterator[str]) -> None:
+        """Attach returned memory identities to the terminal component event."""
+        self.memory_ids.extend(memory_id for memory_id in memory_ids if memory_id)
 
 
 class ComponentTracer:
@@ -164,6 +169,7 @@ class ComponentTracer:
                 event_type=event_type,
                 status=status,
                 output_ref=handle.output_ref,
+                memory_ids=handle.memory_ids,
                 metrics=metrics,
                 error=terminal_error,
                 **common,
