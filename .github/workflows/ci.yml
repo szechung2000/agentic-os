@@ -12,15 +12,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
         with:
-          python-version: "3.12"
+          python-version: "3.13"
+      - name: Check out pinned agent-memory contract
+        uses: actions/checkout@v4
+        with:
+          repository: szechung2000/agent-memory
+          ref: 494610f548b151cd38aa98e573f90774efbb6e73
+          path: agent-memory-pinned
       - name: Install self + deps
         run: |
           uv sync --all-groups
           uv pip install -e .
-      - name: Install agent-memory (local path if available, else git)
-        run: |
-          uv pip install ../agent-memory || uv pip install git+https://github.com/szechung2000/agent-memory.git
+          uv pip install -e ./agent-memory-pinned
       - name: Lint
         run: uv run ruff check .
       - name: Tests
         run: uv run pytest -q
+
+  agent-memory-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: szechung2000/agent-memory
+          ref: 494610f548b151cd38aa98e573f90774efbb6e73
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.13"
+      - name: Pinned unit and golden regression gate
+        run: |
+          uv sync --all-groups --extra local-embeddings
+          uv run ruff check .
+          uv run pytest -q
+          uv run python -m agent_memory.evals.run_golden
+          uv run python -c 'import json, pathlib; scores=json.loads(pathlib.Path("evals/history.jsonl").read_text().splitlines()[-1])["scores"]; minimum={"multihop": 0.83, "glossary": 1.0, "temporal": 1.0, "papers": 0.90}; assert all(scores[k] >= v for k, v in minimum.items()), (scores, minimum)'

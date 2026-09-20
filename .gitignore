@@ -2,3 +2,8 @@
 *.db
 __pycache__/
 .venv/
+
+demo/*.db
+.hermes-citation-ledger.json
+dist/
+.agos/
