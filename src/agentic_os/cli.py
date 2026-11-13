@@ -129,6 +129,27 @@ def cmd_trace_replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_trace_export_langsmith(args: argparse.Namespace) -> int:
+    """Explicit opt-in: export safe trace metadata, not prompts or artifacts."""
+    from agentic_os.core.events import EventStore
+    from agentic_os.observability.langsmith_export import export_trace
+
+    if not args.confirm_upload:
+        print("Refusing cloud upload without --confirm-upload", file=sys.stderr)
+        return 2
+    try:
+        count = export_trace(
+            EventStore(args.db),
+            args.trace_id,
+            project_name=args.project,
+        )
+    except (ImportError, RuntimeError, ValueError) as error:
+        print(f"LangSmith export failed: {error}", file=sys.stderr)
+        return 1
+    print(f"Exported {count} component spans to LangSmith (metadata only)")
+    return 0
+
+
 def cmd_eval_e0(args: argparse.Namespace) -> int:
     from agentic_os.evals.e0 import run_e0_proof
 
@@ -217,6 +238,15 @@ def main(argv: list[str] | None = None) -> int:
     p_replay.add_argument("span_id")
     add_trace_storage(p_replay)
     p_replay.set_defaults(func=cmd_trace_replay)
+
+    p_export = trace_sub.add_parser(
+        "export-langsmith", help="opt-in export of redacted trace metadata"
+    )
+    p_export.add_argument("trace_id")
+    p_export.add_argument("--db", default="./agentic-os-events.db")
+    p_export.add_argument("--project", default="agentic-os")
+    p_export.add_argument("--confirm-upload", action="store_true")
+    p_export.set_defaults(func=cmd_trace_export_langsmith)
 
     p_eval = sub.add_parser("eval", help="run versioned evaluation suites")
     eval_sub = p_eval.add_subparsers(dest="eval_command", required=True)

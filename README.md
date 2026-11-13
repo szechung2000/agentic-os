@@ -140,3 +140,27 @@ Then `agos telegram`.
 ## License
 
 MIT
+
+
+## Control-plane traceability (first increment)
+
+Agentic OS keeps SQLite event history authoritative. When a runtime worker uses a
+`ComponentTracer`, its native Claude Code / Codex / agy event stream is persisted
+as correlated `runtime.*` events. Large stdout/stderr text is **not copied**
+into the event log; the existing artifact store remains the source of recorded
+output. You can inspect the full local trace with `agos trace tree` and
+`agos trace verify`.
+
+LangSmith is **optional** and **off by default**. To export component metadata
+(no prompts, source code, credentials, or CLI stdout/stderr) after a run:
+
+```bash
+uv pip install langsmith
+export LANGSMITH_API_KEY=... # LangSmith tracing credential, not a model API key
+agos trace export-langsmith TRACE_ID --db /path/to/events.db --confirm-upload
+```
+
+The command makes no remote call without `--confirm-upload`. Its failure cannot
+change a completed local run. See
+[Control-plane boundaries](docs/adr-control-plane-observability.md) and
+[roadmap](docs/control-plane-roadmap.md).
