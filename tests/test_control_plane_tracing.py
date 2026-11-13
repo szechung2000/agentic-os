@@ -9,7 +9,7 @@ from agentic_os.cli import main
 from agentic_os.core.artifacts import ArtifactStore
 from agentic_os.core.contracts import ComponentKind, RunEvent
 from agentic_os.core.events import ComponentTracer, EventStore
-from agentic_os.observability.langsmith_export import project_spans
+from agentic_os.observability.langsmith_export import export_trace, project_spans
 from agentic_os.runtimes.contracts import (
     RuntimeEvent,
     RuntimeEventType,
@@ -156,3 +156,9 @@ def test_cloud_export_requires_explicit_confirmation(tmp_path, capsys):
     assert main(["trace", "export-langsmith", "trace-locked", "--db", str(db)]) == 2
     assert "--confirm-upload" in capsys.readouterr().err
     assert len(store.query(trace_id="trace-locked")) == 2
+
+
+def test_library_export_is_opt_in_even_when_called_directly(tmp_path):
+    store = EventStore(tmp_path / "events.db")
+    with pytest.raises(PermissionError, match="upload confirmation"):
+        export_trace(store, "not-present")
