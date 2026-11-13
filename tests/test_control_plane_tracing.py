@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from agentic_os.cli import main
 from agentic_os.core.artifacts import ArtifactStore
