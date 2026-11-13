@@ -69,8 +69,11 @@ def export_trace(
     trace_id: str,
     *,
     project_name: str = "agentic-os",
+    confirm_upload: bool = False,
 ) -> int:
-    """Export on explicit invocation only. Errors never mutate run state."""
+    """Export only after explicit approval. Never mutate local run state."""
+    if not confirm_upload:
+        raise PermissionError("LangSmith export requires explicit upload confirmation")
     try:
         from langsmith.run_trees import RunTree
     except ImportError as error:
