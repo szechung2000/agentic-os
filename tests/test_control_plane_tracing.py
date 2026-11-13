@@ -44,7 +44,7 @@ class StreamingFixture:
             handle_id=handle.handle_id,
             event_type=RuntimeEventType.STDOUT,
             status=RuntimeStatus.RUNNING,
-            summary="auth_token=supersecret123 private source code",
+            summary="private source code: SELECT * FROM accounts",
         )
         yield RuntimeEvent(
             handle_id=handle.handle_id,
@@ -105,9 +105,9 @@ async def test_runtime_events_are_correlated_without_stdout_leak(tmp_path):
     assert records[2].data == {
         "handle_id": result.handle.handle_id,
         "kind": "stdout",
-        "captured_characters": len("auth_token=supersecret123 private source code"),
+        "captured_characters": len("private source code: SELECT * FROM accounts"),
     }
-    assert "supersecret123" not in "\n".join(record.model_dump_json() for record in records)
+    assert "private source code" not in "\n".join(record.model_dump_json() for record in records)
     spans = project_spans(events, "trace-one")
     assert len(spans) == 1
     assert spans[0].event_counts == {
@@ -163,3 +163,13 @@ def test_library_export_is_opt_in_even_when_called_directly(tmp_path):
     store = EventStore(tmp_path / "events.db")
     with pytest.raises(PermissionError, match="upload confirmation"):
         export_trace(store, "not-present")
+
+
+def test_runtime_contract_rejects_secret_before_event_persistence():
+    with pytest.raises(ValueError, match="secret"):
+        RuntimeEvent(
+            handle_id="runtime-fixture",
+            event_type=RuntimeEventType.STDOUT,
+            status=RuntimeStatus.RUNNING,
+            summary="auth_token=supersecret123",
+        )
