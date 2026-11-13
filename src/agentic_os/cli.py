@@ -142,6 +142,7 @@ def cmd_trace_export_langsmith(args: argparse.Namespace) -> int:
             EventStore(args.db),
             args.trace_id,
             project_name=args.project,
+            confirm_upload=args.confirm_upload,
         )
     except (ImportError, RuntimeError, ValueError) as error:
         print(f"LangSmith export failed: {error}", file=sys.stderr)
