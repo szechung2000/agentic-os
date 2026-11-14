@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from typing import Any, Literal, cast
 from uuid import uuid4
 
 from agentic_os.core.artifacts import ArtifactStore
 from agentic_os.core.contracts import TaskContract, WorkerResult
 from agentic_os.core.events import ComponentTracer
+from agentic_os.observability.runtime_events import record_runtime_event
 from agentic_os.runtimes.base import RuntimeAdapter
 from agentic_os.runtimes.contracts import (
     RuntimeExecutionResult,
@@ -70,7 +72,10 @@ class RuntimeWorkerBridge(Worker):
             result = await self._execute(contract)
         else:
             with self.tracer.span(**span_context) as span:
-                result = await self._execute(contract)
+                result = await self._execute(
+                    contract,
+                    trace_context=(trace_id, goal_id, run_id, span.span_id),
+                )
                 trace = self._trace_fields(result)
                 span_context["data"]["runtime_trace"] = trace.model_dump(mode="json")
                 span.terminal_status = self._span_status(result.status)
@@ -79,9 +84,34 @@ class RuntimeWorkerBridge(Worker):
 
         return self._legacy_result(contract, result)
 
-    async def _execute(self, contract: TaskContract) -> RuntimeExecutionResult:
+    async def _execute(
+        self,
+        contract: TaskContract,
+        *,
+        trace_context: tuple[str, str, str, str] | None = None,
+    ) -> RuntimeExecutionResult:
         handle = await self.adapter.start(contract, self.workspace)
-        return await self.adapter.result(handle)
+        try:
+            if trace_context is not None and self.tracer is not None:
+                trace_id, goal_id, run_id, span_id = trace_context
+                async for event in self.adapter.events(handle):
+                    record_runtime_event(
+                        self.tracer.store,
+                        event=event,
+                        trace_id=trace_id,
+                        goal_id=goal_id,
+                        run_id=run_id,
+                        span_id=span_id,
+                        task_id=contract.task_id,
+                        worker_id=self.worker_id,
+                        runtime_name=self.runtime_name,
+                    )
+            return await self.adapter.result(handle)
+        except BaseException:
+            # A failed event stream must not leave an orphaned mutating CLI.
+            with suppress(Exception):
+                await self.adapter.stop(handle)
+            raise
 
     def _task_contract(self, task: dict[str, Any]) -> TaskContract:
         objective = task.get("objective") or task.get("content") or task.get("query")
